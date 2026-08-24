@@ -1,0 +1,53 @@
+# Vaultwarden sur NAS Synology (Container Manager / DSM 7.x)
+# Déploiement : Container Manager > Projet > Créer > "Créer docker-compose.yml"
+# ou en SSH : sudo docker compose up -d
+services:
+  vaultwarden:
+    image: vaultwarden/server:${VW_VERSION:-latest-alpine}
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      # --- Accès public (indispensable pour les passkeys, l'app mobile et les e-mails) ---
+      DOMAIN: ${DOMAIN}
+      # --- Inscriptions ---
+      SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED:-true}
+      SIGNUPS_VERIFY: ${SIGNUPS_VERIFY:-true}
+      INVITATIONS_ALLOWED: ${INVITATIONS_ALLOWED:-true}
+      # Limite les inscriptions à un ou plusieurs domaines e-mail (facultatif)
+      SIGNUPS_DOMAINS_WHITELIST: ${SIGNUPS_DOMAINS_WHITELIST:-}
+      # --- Page d'administration /admin (laisser vide pour la désactiver) ---
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      # --- Fonctions ---
+      WEBSOCKET_ENABLED: "true"      # synchro temps réel (même port que le web, /notifications/hub)
+      SENDS_ALLOWED: ${SENDS_ALLOWED:-true}
+      EMERGENCY_ACCESS_ALLOWED: ${EMERGENCY_ACCESS_ALLOWED:-true}
+      ORG_CREATION_USERS: ${ORG_CREATION_USERS:-}
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      PUSH_INSTALLATION_ID: ${PUSH_INSTALLATION_ID:-}
+      PUSH_INSTALLATION_KEY: ${PUSH_INSTALLATION_KEY:-}
+      # --- Anti-brute force (lu par fail2ban si vous l'activez) ---
+      LOG_FILE: /data/vaultwarden.log
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      EXTENDED_LOGGING: "true"
+      # --- SMTP (facultatif mais recommandé : invitations, 2FA e-mail, alertes) ---
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Vaultwarden}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      # --- Divers ---
+      ROCKET_WORKERS: ${ROCKET_WORKERS:-4}
+      TZ: ${TZ:-Europe/Luxembourg}
+    volumes:
+      - ${DATA_PATH:-/volume1/docker/vaultwarden/data}:/data
+    ports:
+      # Écoute uniquement en HTTP en local : le HTTPS est assuré par le
+      # reverse proxy de DSM (Portail de connexion > Proxy inversé).
+      - "${HTTP_PORT:-8222}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
