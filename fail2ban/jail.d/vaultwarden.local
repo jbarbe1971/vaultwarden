@@ -1,0 +1,36 @@
+# ---------------------------------------------------------------------------
+# Prisons fail2ban pour Vaultwarden
+# Le conteneur fail2ban lit /vaultwarden/vaultwarden.log (monté en lecture
+# seule depuis DATA_PATH) et bannit via iptables sur le réseau de l'hôte.
+# ---------------------------------------------------------------------------
+[DEFAULT]
+# Ne jamais bannir le NAS lui-même ni le LAN (sinon vous vous verrouillez dehors).
+# Adaptez à votre plan d'adressage.
+ignoreip = 127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+# Bannissement progressif : chaque récidive multiplie la durée.
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 30d
+# Le conteneur tourne en network_mode: host, donc iptables agit sur le NAS.
+banaction = iptables-allports
+chain = INPUT
+
+[vaultwarden]
+enabled = true
+filter = vaultwarden
+logpath = /vaultwarden/vaultwarden.log
+port = http,https
+maxretry = 5
+findtime = 30m
+bantime = 4h
+datepattern = ^\[%%Y-%%m-%%d %%H:%%M:%%S
+
+[vaultwarden-admin]
+enabled = true
+filter = vaultwarden-admin
+logpath = /vaultwarden/vaultwarden.log
+port = http,https
+maxretry = 3
+findtime = 30m
+bantime = 24h
+datepattern = ^\[%%Y-%%m-%%d %%H:%%M:%%S

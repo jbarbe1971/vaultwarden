@@ -17,7 +17,10 @@ sous **DSM 7.x** avec **Container Manager**.
 | `.env.example` | Toutes les variables à personnaliser — à copier en `.env` |
 | `scripts/backup-vaultwarden.sh` | Sauvegarde cohérente (base + clés + pièces jointes), avec rotation |
 | `scripts/restore-vaultwarden.sh` | Restauration d'une archive de sauvegarde |
+| `scripts/rotate-vaultwarden-log.sh` | Rotation du journal lu par fail2ban |
+| `fail2ban/` | Filtres et prisons fail2ban à copier sur le NAS |
 | `docs/reverse-proxy.md` | Proxy inversé DSM + certificat Let's Encrypt, pas à pas |
+| `docs/fail2ban.md` | Blocage des attaques par force brute, pas à pas |
 | `docs/depannage.md` | Erreurs fréquentes et solutions |
 
 ## Prérequis
@@ -45,7 +48,7 @@ En SSH (Panneau de configuration > Terminal & SNMP > Activer SSH), ou via File S
 sudo mkdir -p /volume1/docker/vaultwarden/{data,backups,scripts}
 ```
 
-Copiez `docker-compose.yml`, `.env` et le dossier `scripts/` dans
+Copiez `docker-compose.yml`, `.env` et les dossiers `scripts/` et `fail2ban/` dans
 `/volume1/docker/vaultwarden/`.
 
 ## 2. Configurer le `.env`
@@ -112,7 +115,35 @@ proxy inversé `vault.mondomaine.lu` → `localhost:8222`, en-têtes WebSocket
 4. Les utilisateurs supplémentaires se créent ensuite par **invitation**
    (`INVITATIONS_ALLOWED=true` + SMTP configuré), ou depuis `/admin`.
 
-## 6. Sauvegardes
+## 6. fail2ban (protection contre la force brute)
+
+Le service `fail2ban` est déjà déclaré dans le `docker-compose.yml` : il démarre en même
+temps que Vaultwarden, lit `data/vaultwarden.log` et bannit via iptables les IP qui
+enchaînent les échecs (5 échecs de mot de passe → 4 h, 3 jetons `/admin` invalides →
+24 h, durées doublées à chaque récidive).
+
+Deux points à ne pas manquer :
+
+- l'en-tête `X-Real-IP` doit être configuré dans le proxy inversé DSM, sinon toutes les
+  tentatives semblent venir de `127.0.0.1` et **rien n'est protégé** ;
+- `ignoreip` dans `fail2ban/jail.d/vaultwarden.local` doit contenir votre sous-réseau
+  local, pour éviter de vous bannir vous-même.
+
+Contrôle rapide :
+
+```bash
+sudo docker exec vaultwarden-fail2ban fail2ban-client status vaultwarden
+```
+
+Détails, tests et limites : **[docs/fail2ban.md](docs/fail2ban.md)**.
+
+Le journal étant désormais persistant, planifiez aussi sa rotation (hebdomadaire, root) :
+
+```bash
+bash /volume1/docker/vaultwarden/scripts/rotate-vaultwarden-log.sh
+```
+
+## 7. Sauvegardes
 
 Le NAS n'est pas une sauvegarde : perdre `data/` (base **et** `rsa_key.pem`) signifie
 perdre le coffre. Deux niveaux :
@@ -136,7 +167,7 @@ au moins une fois :
 sudo bash scripts/restore-vaultwarden.sh /volume1/docker/vaultwarden/backups/vaultwarden-AAAAMMJJ-HHMMSS.tar.gz
 ```
 
-## 7. Mises à jour
+## 8. Mises à jour
 
 ```bash
 cd /volume1/docker/vaultwarden
@@ -158,7 +189,8 @@ En production, épinglez la version dans `.env` (`VW_VERSION=1.34.3-alpine`) plu
 - `ADMIN_TOKEN` haché, ou `/admin` désactivé et réservé aux cas exceptionnels.
 - Pare-feu DSM actif (Panneau de configuration > Sécurité > Pare-feu) : n'autoriser
   80/443 que depuis Internet, l'administration DSM depuis le LAN uniquement.
-- Blocage automatique DSM activé, et éventuellement fail2ban sur `data/vaultwarden.log`.
+- Blocage automatique DSM activé **et** fail2ban en service (voir
+  [docs/fail2ban.md](docs/fail2ban.md)).
 - Si vous préférez ne rien exposer : accès via **VPN** (paquet DSM *VPN Server*
   ou Tailscale) — dans ce cas `DOMAIN` doit pointer vers un nom résolu en HTTPS
   à l'intérieur du VPN.

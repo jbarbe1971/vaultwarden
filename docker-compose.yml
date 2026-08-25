@@ -27,6 +27,9 @@ services:
       PUSH_INSTALLATION_KEY: ${PUSH_INSTALLATION_KEY:-}
       # --- Anti-brute force (lu par fail2ban si vous l'activez) ---
       LOG_FILE: /data/vaultwarden.log
+      # En-tête renseigné par le proxy inversé DSM : sans lui, toutes les
+      # tentatives semblent venir de 127.0.0.1 et fail2ban est inopérant.
+      IP_HEADER: ${IP_HEADER:-X-Real-IP}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       EXTENDED_LOGGING: "true"
       # --- SMTP (facultatif mais recommandé : invitations, 2FA e-mail, alertes) ---
@@ -46,6 +49,38 @@ services:
       # Écoute uniquement en HTTP en local : le HTTPS est assuré par le
       # reverse proxy de DSM (Portail de connexion > Proxy inversé).
       - "${HTTP_PORT:-8222}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # fail2ban : bannit les IP qui multiplient les échecs de connexion.
+  # Lit le journal de Vaultwarden et pose des règles iptables sur le NAS,
+  # d'où network_mode: host et les capacités NET_ADMIN / NET_RAW.
+  # ---------------------------------------------------------------------------
+  fail2ban:
+    image: crazymax/fail2ban:${F2B_VERSION:-latest}
+    container_name: vaultwarden-fail2ban
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      TZ: ${TZ:-Europe/Luxembourg}
+      F2B_LOG_TARGET: STDOUT
+      F2B_LOG_LEVEL: ${F2B_LOG_LEVEL:-INFO}
+      F2B_DB_PURGE_AGE: ${F2B_DB_PURGE_AGE:-30d}
+      F2B_IPTABLES_CHAIN: INPUT
+    volumes:
+      # Configuration versionnée (jail.d/ et filter.d/) + base des bannissements
+      - ${F2B_CONFIG_PATH:-/volume1/docker/vaultwarden/fail2ban}:/data
+      # Journal de Vaultwarden, en lecture seule
+      - ${DATA_PATH:-/volume1/docker/vaultwarden/data}:/vaultwarden:ro
+    depends_on:
+      - vaultwarden
     logging:
       driver: json-file
       options:

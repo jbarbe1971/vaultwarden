@@ -71,3 +71,31 @@ sudo bash scripts/restore-vaultwarden.sh /volume1/docker/vaultwarden/backups/vau
 Impossible côté serveur : le coffre est chiffré de bout en bout avec ce mot de passe.
 Depuis `/admin`, on peut seulement supprimer le compte (et donc son contenu), ou
 utiliser l'**accès d'urgence** si un contact de confiance a été configuré au préalable.
+
+## fail2ban ne bannit personne
+
+```bash
+sudo docker exec vaultwarden-fail2ban fail2ban-client status vaultwarden
+sudo docker logs --tail 50 vaultwarden-fail2ban
+```
+
+- `Currently failed: 0` alors que les échecs s'accumulent : le journal n'est pas lu.
+  Vérifiez le montage `-v .../data:/vaultwarden:ro` et l'existence de
+  `data/vaultwarden.log` (variable `LOG_FILE`).
+- Les échecs sont comptés mais aucun bannissement : toutes les IP journalisées sont
+  `127.0.0.1` (donc dans `ignoreip`). L'en-tête `X-Real-IP` manque dans le proxy inversé
+  DSM, ou `IP_HEADER` ne correspond pas à cet en-tête.
+- `iptables: Permission denied` : les capacités `NET_ADMIN` / `NET_RAW` ou
+  `network_mode: host` ont été perdues lors d'une modification du compose.
+- Les chaînes `f2b-*` ont disparu après une modification du pare-feu DSM :
+  `sudo docker restart vaultwarden-fail2ban`.
+
+## Je me suis fait bannir par fail2ban
+
+Depuis le NAS (SSH en LAN, jamais banni grâce à `ignoreip`) :
+
+```bash
+sudo docker exec vaultwarden-fail2ban fail2ban-client set vaultwarden unbanip VOTRE_IP
+```
+
+En dernier recours, arrêtez le conteneur : `sudo docker stop vaultwarden-fail2ban`.

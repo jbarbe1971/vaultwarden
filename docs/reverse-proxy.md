@@ -70,7 +70,9 @@ Ajoutez également, via *Créer > En-tête personnalisé* :
 | `X-Forwarded-For` | `$proxy_add_x_forwarded_for` |
 | `X-Real-IP` | `$remote_addr` |
 
-(utile pour que les journaux et fail2ban voient la vraie IP source).
+Ces deux en-têtes ne sont **pas optionnels si vous utilisez fail2ban** : sans eux,
+Vaultwarden journalise `127.0.0.1` pour toutes les tentatives et le bannissement
+devient inopérant (voir [fail2ban.md](fail2ban.md)).
 
 Sans les en-têtes WebSocket, tout fonctionne mais la synchronisation temps réel entre
 appareils ne se déclenche qu'au rafraîchissement manuel.

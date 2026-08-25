@@ -2,3 +2,5 @@
 data/
 *.log
 backups/
+fail2ban/db/
+fail2ban/fail2ban.sqlite3
