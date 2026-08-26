@@ -17,6 +17,8 @@ sous **DSM 7.x** avec **Container Manager**.
 | `.env.example` | Toutes les variables à personnaliser — à copier en `.env` |
 | `scripts/backup-vaultwarden.sh` | Sauvegarde cohérente (base + clés + pièces jointes), avec rotation |
 | `scripts/restore-vaultwarden.sh` | Restauration d'une archive de sauvegarde |
+| `scripts/install-docker-rootless-ubuntu.sh` | Installe Docker + Compose v2 en rootless sur Ubuntu, compatible identités temporaires step-ca |
+| `docs/docker-rootless-stepca.md` | Docker rootless + step-ca : modes, exploitation, dépannage |
 | `docs/reverse-proxy.md` | Proxy inversé DSM + certificat Let's Encrypt, pas à pas |
 | `docs/depannage.md` | Erreurs fréquentes et solutions |
 
@@ -162,6 +164,22 @@ En production, épinglez la version dans `.env` (`VW_VERSION=1.34.3-alpine`) plu
 - Si vous préférez ne rien exposer : accès via **VPN** (paquet DSM *VPN Server*
   ou Tailscale) — dans ce cas `DOMAIN` doit pointer vers un nom résolu en HTTPS
   à l'intérieur du VPN.
+
+## Variante : serveur Ubuntu en Docker rootless
+
+Le kit vise d'abord le NAS Synology, mais le même `docker-compose.yml` se déploie sur un
+serveur Ubuntu. Dans ce cas, préférez un démon **rootless** — une évasion de conteneur ne
+donne alors pas root sur l'hôte :
+
+```bash
+sudo ./scripts/install-docker-rootless-ubuntu.sh \
+    --ca-url https://ca.exemple.lu:8443 --ca-fingerprint <empreinte>
+```
+
+Le script installe Docker Engine + Compose v2 en rootless, désactive le démon privilégié
+et rend l'ensemble utilisable par des **identités temporaires step-ca** (certificats SSH
+de courte durée, comptes éphémères). Détails, modes de fonctionnement et dépannage :
+[`docs/docker-rootless-stepca.md`](docs/docker-rootless-stepca.md).
 
 ## Ressources
 
